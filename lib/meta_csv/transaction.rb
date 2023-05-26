@@ -1,11 +1,11 @@
 # frozen_string_literal: true
 
-require_relative 'bazooka_base'
+require_relative 'meta_csv_base'
 
-module Bazooka
+module MetaCsv 
   # `Transaction` is really just a single data point
   class Transaction
-    include BazookaBase
+    include MetaCsvBase 
 
     LedgerTransaction = Data.define(*LEDGER_LIVE_CSV_ROW_HEADERS.values)
     CoinTrackerTransaction = Data.define(*COIN_TRACKER_CSV_ROW_HEADERS.values)

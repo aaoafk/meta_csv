@@ -1,12 +1,8 @@
 # frozen_string_literal: true
 
 # REVIEW: Possibility of implementing with Rover?
-require_relative 'bazooka_base'
-
-module Bazooka
+module MetaCsv
   class CSVDataManipulator # :nodoc:
-
-    include BazookaBase
 
     # TODO: Implement a set of valid operations on a csv that's a crypto tax format
     def initialize(csv:)

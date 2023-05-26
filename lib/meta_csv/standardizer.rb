@@ -2,7 +2,7 @@
 
 require 'singleton'
 
-module Bazooka
+module MetaCsv 
   class Standardizer # :nodoc:
     include Singleton
   end

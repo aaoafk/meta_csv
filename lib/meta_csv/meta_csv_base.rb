@@ -1,22 +1,17 @@
 # frozen_string_literal: true
 
-require 'active_support/core_ext/string/inflections'
-require 'dry/schema'
-require 'refinements/hashes'
-require 'refinements/strings'
-
-module Bazooka
-  module BazookaBase
+module MetaCsv 
+  module MetaCsvBase 
+    require 'dry/schema'
     Dry::Schema.load_extensions :monads
 
     include Dry::Monads[:result]
-
-    using Refinements::Hashes
 
     LEDGER_LIVE_CSV_SOURCE = :LEDGER_LIVE_CSV_SOURCE
     COIN_TRACKER_CSV_SOURCE = :COIN_TRACKER_CSV_SOURCE
     TURBO_TAX_CSV_SOURCE = :TURBO_TAX_CSV_SOURCE
     OTHER_CSV_SOURCE = :OTHER_CSV_SOURCE
+    INFER = :INFER
 
     ###########################################################################
     #               RESEARCHED CONSTANTS THAT MIGHT BE VALUABLE                #
@@ -43,6 +38,8 @@ module Bazooka
     ###########################################################################
     #                    SCHEMAS TO VALIDATE TRANSFORMATION                    #
     ###########################################################################
+
+    require 'refinements/hashes'
 
     LedgerLiveValidationSchema = Dry::Schema.Params do
       before(:key_coercer) { |result| result.to_h.symbolize_keys! }
@@ -133,12 +130,5 @@ module Bazooka
       'transaction_id' => :transaction_id
     }.freeze
 
-    ###########################################################################
-    #   USER SUPPLIED CSV VALUES DECLARED IN parser.rb AND THEN FROZEN   #
-    ###########################################################################
-
-    class << self
-      attr_accessor :other_csv_row_headers, :other_validation_schema
-    end
   end
 end

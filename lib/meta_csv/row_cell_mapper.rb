@@ -1,51 +1,45 @@
 # frozen_string_literal: true
 
-require_relative 'bazooka_base'
+require_relative 'meta_csv_base'
 require_relative 'transaction'
 
-module Bazooka
-  class TransactionDataMapper # :nodoc:
-    include BazookaBase
-    attr_accessor :transaction, :meta_csv
-    attr_reader :standardizer
+module MetaCsv 
+  class RowCellMapper # :nodoc:
+    include MetaCsvBase 
+    attr_accessor :meta_csv
+    attr_reader :curr_row, :standardizer
 
     def initialize(meta_csv)
       @meta_csv = meta_csv
       @standardizer = Standardizer.instance
       x = Data.define(*meta_csv.old_headers.each(&:to_sym))
-      TransactionDataMapper.const_set('GeneralTransaction', x)
+      RowCellMapper.const_set('InferredRow', x)
     end
 
-    def transaction=(curr_csv_row)
-      case meta_csv.source
-      when LEDGER_LIVE_CSV_SOURCE
-        @transaction = initialize_ledger_transaction curr_csv_row
-      when COIN_TRACKER_CSV_SOURCE
-        @transaction = initialize_general_transaction curr_csv_row
-      when TURBO_TAX_CSV_SOURCE
-        @transaction = initialize_general_transaction curr_csv_row
-      else
-        @transaction = initialize_general_transaction curr_csv_row
-      end
+    def curr_row=(curr_csv_row)
+      @curr_row = initialize_inferred_row curr_csv_row
     end
 
-    def standardize_transaction
+    def standardize_row
+
+      #########################################################################################################################
+      # If the validator infers then everything is given .maybe how can we guard nil access with transformation functions?    #
+      #########################################################################################################################
       standardized_row = []
-      puts
       standardizer.standardizing_functions.each do |st|
-        standardized_row << (st.invoke_standardization.call transaction)
+        standardized_row << (st.invoke_standardization.call curr_row)
       end
       standardized_row
     end
 
     private
 
-    def initialize_general_transaction curr_csv_row
-      trans_hsh = {}
+    def initialize_inferred_row curr_csv_row
+      row_data = {}
       standardizer.old_headers.each do |el|
-        trans_hsh.fetch(el) { |k| trans_hsh[k] = curr_csv_row[el] }
+        row_data.fetch(el) { |k| row_data[k] = curr_csv_row[el] }
       end
-      GeneralTransaction.new(**trans_hsh)
+      InferredRow.new(**row_data)
     end
 
     def initialize_ledger_transaction curr_csv_row
@@ -64,13 +58,13 @@ module Bazooka
       )
     end
 
-
-    # TODO: All of these just hook into initialize_general_transaction
+    ###########################################################################
+    #    All of these could hook into the initialize inferred row method...   #
+    ###########################################################################
     def initialize_coin_tracker_transaction curr_csv_row
       Transaction::CoinTrackerTransaction.new
     end
 
-    # TODO: Implement with headers
     def initialize_turbo_tax_transaction curr_csv_row
       Transaction::TurboTaxTransaction.new
     end

@@ -2,9 +2,9 @@
 
 require "test_helper"
 
-class TestBazooka < Minitest::Test
+class TestMetaCsv < Minitest::Test
   def test_that_it_has_a_version_number
-    refute_nil ::Bazooka::VERSION
+    refute_nil ::MetaCsv::VERSION
   end
 
   def test_it_does_something_useful

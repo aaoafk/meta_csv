@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative 'os'
+
 module MetaCsv 
   module MetaCsvBase 
     require 'parallel'
@@ -8,11 +10,18 @@ module MetaCsv
 
     include Dry::Monads[:result]
 
+    ###########################################################################
+    #              used for parallel processing and csv chunking               #
+    ###########################################################################
+    BATCH_SIZE = 2048
+    CPUS_AVAILABLE = OS.cores
+
     LEDGER_LIVE_CSV_SOURCE = :LEDGER_LIVE_CSV_SOURCE
     COIN_TRACKER_CSV_SOURCE = :COIN_TRACKER_CSV_SOURCE
     TURBO_TAX_CSV_SOURCE = :TURBO_TAX_CSV_SOURCE
     OTHER_CSV_SOURCE = :OTHER_CSV_SOURCE
     INFER = :INFER
+
 
     ###########################################################################
     #               RESEARCHED CONSTANTS THAT MIGHT BE VALUABLE                #

@@ -14,6 +14,7 @@ module MetaCsv
     CPUS_AVAILABLE = OS.cores
 
     attr_accessor :csv_table, :headers, :inferred_encoding, :csv_chunks
+
     def initialize(file:)
       @csv_chunks = Array.new
       @csv_table = initialize_chunks file

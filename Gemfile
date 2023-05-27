@@ -24,3 +24,5 @@ gem 'refinements'
 gem 'csv'
 
 gem 'activesupport'
+
+gem 'parallel'

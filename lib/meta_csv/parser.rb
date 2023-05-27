@@ -4,37 +4,55 @@ require 'csv'
 require 'active_support/core_ext/string/inflections'
 require_relative 'meta_csv_base'
 require_relative 'os'
+require 'parallel'
 
 module MetaCsv
   class Parser # :nodoc:
     include MetaCsvBase
 
-    attr_accessor :csv_table, :headers, :inferred_encoding
-    attr_reader :csv_mem_efficient_iterator
+    BATCH_SIZE = 2048
+    CPUS_AVAILABLE = OS.cores
 
+    attr_accessor :csv_table, :headers, :inferred_encoding, :csv_chunks
     def initialize(file:)
-      @csv_table = initialize_body file
-      @csv_mem_efficient_iterator = initialize_enumerator file
+      @csv_chunks = Array.new
+      @csv_table = initialize_chunks file
     end
 
     private
 
-    def initialize_body file
-      f = File.open(file)
+    CsvChunk = Data.define(:rows)
+    def initialize_chunks file
       raise "#{file} does not exist...Is this the correct file path?" unless File.exist? file
 
       # Determine encoding
       @inferred_encoding = infer_encoding_or_default file
 
-      # The instance allows us to cache a CSV object for retrieval if we use the same headers
-      CSV.instance(f, encoding: inferred_encoding, headers: true, header_converters: converters, skip_blanks: true)
-      res = CSV.instance(f, encoding: inferred_encoding, headers: true, header_converters: converters, skip_blanks: true).read
+      File.open(file) do |f|
+        headers = f.first
+        f.lazy.each_slice(BATCH_SIZE) do |lines|
+          csv_chunks << CsvChunk.new(
+            rows: CSV.parse(lines.join, encoding: inferred_encoding, headers: headers, header_converters: converters, skip_blanks: true)
+          )
+        end
+      end
 
+      ::Parallel.map(csv_chunks, in_ractors: CPUS_AVAILABLE, ractor: [Parser, :process_chunks])
+      ::Parallel.map(csv_chunks, in_ractors: CPUS_AVAILABLE, ractor: [Parser, :shuffle_chunk_data])
+    end
+
+    def self.shuffle_chunk_data chunk
+      data = chunk.rows
+      data.to_a.shuffle
+    end
+
+    def self.process_chunks chunk
       # Remove duplicate rows from further processing
-      res = res.to_a.uniq! || res
+      data = chunk.rows
+      data = data.to_a.uniq! || data
 
-      # Resolve duplicate headers by grabbing the first value or everything
-      res.each_with_index do |row, idx|
+      # resolve duplicate headers by grabbing the first value or everything
+      data.each_with_index do |row, _|
         seen = {}
         row.each_pair do |header, val|
           seen[header] ||= []
@@ -43,11 +61,6 @@ module MetaCsv
         vals = seen.transform_values { |v| v.size == 1 ? v[0] : v }
         vals.each { |k, v| row[k] = v }
       end
-
-      exit if res.empty?
-      at_exit { "file: #{file} has zero rows..." }
-
-      res # Should be CSV::Table
     end
 
     def infer_encoding_or_default file
@@ -59,10 +72,6 @@ module MetaCsv
 
       # Default
       Encoding.default_external.to_s
-    end
-
-    def initialize_enumerator file
-      CSV.foreach file, headers: true, header_converters: converters
     end
 
     def converters

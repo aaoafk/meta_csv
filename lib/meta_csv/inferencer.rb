@@ -31,11 +31,12 @@ module Inferencer
       'dash_y4_m2_d2_H_M_S_MS' => '%Y-%m-%d %I:%M:%S %p'
     }.freeze
 
-    # cells respond to header and value
+    # A cell responds to header and value
     def infer_types_for_cells cells
       inferred_types_for_headers = {}
       cells.each do |cell|
-        if cell.value =~ /^[-+]?[0-9]+\.[0-9]+$/
+        ap cell.value
+        if cell.value =~ /^[-+]?[0-9]*\.[0-9]+$/
           inferred_types_for_headers[cell.header] = Float
         elsif cell.value =~ /^\d+$/
           inferred_types_for_headers[cell.header] = Integer

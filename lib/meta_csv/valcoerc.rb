@@ -9,6 +9,7 @@ module MetaCsv
     attr_accessor :schema, :csv_props, :date_format, :dried_csv, :columns_with_multiple_values
     attr_reader :header_to_type
 
+    Cell = Data.define :header, :value
     # csv_props has most of the information we need
     def run(csv_props:, user_schema:)
       @csv_props = csv_props
@@ -39,16 +40,19 @@ module MetaCsv
       else
         warn 'did not validate using schema because the source was not set... continuing execution...'
       end
-
     end
 
     def verify_schema_transform(schema_validation_result:)
       case schema_validation_result
       in Success(result) then return result.to_h[:body]
-      in Failure(result) then raise SchemaValidationFailedError.new(msg: ap(result.errors(locale: ))
+      in Failure(result) then raise SchemaValidationFailedError.new(msg: ap(result.errors.to_h))
+      end
     end
 
-    Cell = Data.define :header, :value
+    # The issue with this is that it assumes that one row is representative of the type state
+    # for every row...
+
+    # Columns can have mixed types... How should we deal with columns with mixed types
     def infer_types_for_data column_to_singular_value
       cells = []
       column_to_singular_value.each do |k, v|
@@ -66,11 +70,11 @@ module MetaCsv
         csv_props.csv_table.each do |row|
           next if row[looking_for].nil?
           if (idx = row[looking_for].index(','))
-            seen[looking_for] = row[looking_for]
+            seen[looking_for] = row[looking_for][0...idx]
             multiple_value_columns << looking_for
             break
           end
-          seen[looking_for] = row[looking_for][0...idx] 
+          seen[looking_for] = row[looking_for]
           break
         end
       end
@@ -97,6 +101,8 @@ module MetaCsv
       schema_builder << "  end\n"
       schema_builder << "end\n"
       @schema = eval(schema_builder)
+      ap schema
+      exit
     end
 
     def dry_inferred_type el
@@ -138,7 +144,6 @@ module MetaCsv
     end
 
     class ValCoercError < ::StandardError; end
-
     class SchemaValidationFailedError < ValCoercError; end
   end
 end

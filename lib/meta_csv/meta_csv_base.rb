@@ -2,6 +2,7 @@
 
 module MetaCsv 
   module MetaCsvBase 
+    require 'parallel'
     require 'dry/schema'
     Dry::Schema.load_extensions :monads
 

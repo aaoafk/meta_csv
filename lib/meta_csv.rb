@@ -12,7 +12,7 @@ require_relative 'meta_csv/valcoerc'
 
 module MetaCsv # :nodoc:
   class Manager
-    CsvProps = Data.define(:old_headers, :new_headers, :source, :csv_table, :proc_csv_mem_efficient)
+    CsvProps = Data.define(:old_headers, :new_headers, :source, :csv_table, :proc_csv_mem_efficient, :inferred_encoding)
     StandardTransformation = Data.define(:column_order, :new_column_name, :invoke_standardization)
     include MetaCsvBase
     class << self
@@ -72,6 +72,13 @@ module MetaCsv # :nodoc:
 
       result = Parser.new(file: file_path)
 
+      result.csv_chunks.each do |chunk|
+        chunk.rows.each do |row|
+          ap row
+        end
+      end
+      exit
+
       m = CsvProps.new(
         old_headers: result.csv_table.headers,
         new_headers: nhn,
@@ -95,9 +102,7 @@ module MetaCsv # :nodoc:
       ###################################################################################################
       coerced_csv = ValCoerc.new.run(csv_props: m, user_schema:)
 
-      ap coerced_csv
       exit
-
       transformer = MetaCsv::Transformer.new(meta_csv: m)
       transformed_csv = transformer.run
 

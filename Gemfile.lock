@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    meta_csv(0.1.0)
+    meta_csv (0.1.0)
 
 GEM
   remote: https://rubygems.org/
@@ -97,12 +97,13 @@ PLATFORMS
 DEPENDENCIES
   activesupport
   amazing_print
-  meta_csv!
   csv
   debug
   dry-monads
   dry-schema
+  meta_csv!
   minitest (~> 5.0)
+  parallel
   rake (~> 13.0)
   refinements
   standard (~> 1.3)

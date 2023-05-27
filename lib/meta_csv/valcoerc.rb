@@ -3,105 +3,142 @@
 require_relative 'inferencer'
 require_relative 'meta_csv_base'
 
-module MetaCSV
-  module ValCoerc
+module MetaCsv
+  class ValCoerc
     include MetaCsvBase
-    class << self
-      attr_accessor :schema, :source, :meta_csv_props, :date_format, :dried_csv
-      attr_reader :header_to_type
+    attr_accessor :schema, :csv_props, :date_format, :dried_csv, :columns_with_multiple_values
+    attr_reader :header_to_type
 
-      # csv_props has most of the information we need
-      def run(csv_props:, schema:, source:)
-        @csv_props = csv_props
-        @source = source
-        @header_to_type = infer_types_from_csv_row(csv_props.csv_table[1]) unless schema
+    # csv_props has most of the information we need
+    def run(csv_props:, user_schema:)
+      @csv_props = csv_props
+      @header_to_type = infer_types_for_data(element_to_infer_from) unless schema
 
-        # if schema is provided then just validate using it.
-        # Dynamically build the schema in build_schema
-        @schema = schema || build_schema(params: csv_props.old_headers)
+      # Dynamically build the schema in build_schema if we don't get one
+      build_schema unless user_schema
+      initialize_schema
 
-        @dried_csv = dry_csv
-        # We need to coerce types here using a schema if we want to use values reliably in transformer
-        validate_using_schema
+      # Build the array of hashes that dry can ingest
+      @dried_csv = dry_csv_structure
+
+      validate_using_schema
+    end
+
+    def validate_using_schema
+      case csv_props.source
+      when LEDGER_LIVE_CSV_SOURCE
+        verify_schema_transform(schema_validation_result: LedgerLiveValidationSchema.call(body: dried_csv).to_monad)
+      when TURBO_TAX_CSV_SOURCE
+        verify_schema_transform(schema_validation_result: TurboTaxValidationSchema.call(body: dried_csv).to_monad)
+      when COIN_TRACKER_CSV_SOURCE 
+        verify_schema_transform(schema_validation_result: CoinTrackerValidationSchema.call(body: dried_csv).to_monad)
+      when OTHER_CSV_SOURCE 
+        verify_schema_transform(schema_validation_result: OtherValidationSchema.call(body: dried_csv).to_monad)
+      when INFER
+        verify_schema_transform(schema_validation_result: InferredSchema.call(body: dried_csv).to_monad)
+      else
+        warn 'did not validate using schema because the source was not set... continuing execution...'
       end
 
-      def validate_using_schema
-        case source
-        when LEDGER_LIVE_CSV_SOURCE
-          verify_schema_transform(schema_validation_result: LedgerLiveValidationSchema.call(body: result).to_monad)
-        when TURBO_TAX_CSV_SOURCE
-          verify_schema_transform(schema_validation_result: TurboTaxValidationSchema.call(body: result).to_monad)
-        when COIN_TRACKER_CSV_SOURCE 
-          verify_schema_transform(schema_validation_result: CoinTrackerValidationSchema.call(body: result).to_monad)
-        when OTHER_CSV_SOURCE 
-          verify_schema_transform(schema_validation_result: OtherValidationSchema.call(body: result).to_monad)
-        when INFER
-          verify_schema_transform(schema_validation_result: InferredSchema.call(body: result).to_monad)
-        else
-          warn 'did not validate using schema because the source was not set... continuing execution...'
+    end
+
+    def verify_schema_transform(schema_validation_result:)
+      case schema_validation_result
+      in Success(result) then return result.to_h[:body]
+      in Failure(result) then raise SchemaValidationFailedError.new(msg: ap(result.errors(locale: ))
+    end
+
+    Cell = Data.define :header, :value
+    def infer_types_for_data column_to_singular_value
+      cells = []
+      column_to_singular_value.each do |k, v|
+        cells << Cell.new(header: k, value: v)
+      end
+      Inferencer.infer_types_for_cells cells
+    end
+
+    # Because we wrap duplicate values we need to make sure that they are accounted for here...
+    def element_to_infer_from
+      seen = {}
+      unseen = csv_props.old_headers
+      multiple_value_columns = []
+      while (looking_for = unseen.pop)
+        csv_props.csv_table.each do |row|
+          next if row[looking_for].nil?
+          if (idx = row[looking_for].index(','))
+            seen[looking_for] = row[looking_for]
+            multiple_value_columns << looking_for
+            break
+          end
+          seen[looking_for] = row[looking_for][0...idx] 
+          break
         end
       end
 
-      def verify_schema_transform(schema_validation_result:)
-        case schema_validation_result
-        in Success(result) then return
-        in Failure(result) then raise SchemaValidationFailedError.new(msg: ap(result))
-        end
+      @columns_with_multiple_values = multiple_value_columns
+      seen
+    end
+
+    # Build a schema with column names that are snakified and types that are inferred
+
+    using Refinements::Hashes
+    def build_schema
+      # 1. strings are of the form `required(:column_name).maybe(:column_type)`
+      schema_builder = String.new
+      begin_schema_declaration = "schema = Dry::Schema.Params do\n"
+      schema_builder << begin_schema_declaration
+      schema_builder << "  before(:key_coercer) { |result| result.to_h.symbolize_keys! }\n"
+      schema_builder << "  required(:body).array(:hash) do\n"
+      csv_props.csv_table.headers.each do |el|
+        # header_to_type[el] is a constant that needs to be converted to the symbol that dry understands
+        str_type = dry_inferred_type(header_to_type[el])
+        schema_builder << "    required(:#{el}).maybe(:#{str_type})\n"
       end
+      schema_builder << "  end\n"
+      schema_builder << "end\n"
+      @schema = eval(schema_builder)
+    end
 
-      Cell = Data.define :header, :value
-      def infer_types_from_csv_row csv_row
-        cells = []
-        csv_row.each_pair do |k, v|
-          cells << Cell.new(header: k, value: v[1])
-        end
-        Inferencer.infer_types_for_csv_row cells
-        # build_schema_from_inferred_types(types: inferred_types_for_row)
-      end
-
-      # Build a schema with column names that are snakified and types that are inferred
-      def build_schema(params:)
-        # 1. strings are of the form `required(:column_name).maybe(:column_type)`
-        begin_schema_declaration = "schema = Dry::Schema.Params do \n"
-        schema << begin_schema_declaration
-        params.each do |el|
-          # header_to_type[el] is a constant that needs to be converted to the symbol that dry understands
-          schema << "required(:#{el}).maybe(:#{dry_inferred_type(header_to_type[el])})\n"
-        end
-        schema << "end"
-
-        initialize_schema
-      end
-
-      def dry_inferred_type el
-        case el
-        in Integer
-          'integer'
-        in Float
-          'float'
-        in String
-          'string'
-        in [Date, date_format_str]
-          @date_format = date_format_str
-          'datetime'
-        end
-      end
-
-      def initialize_schema
-        case source
-        when LEDGER_LIVE_CSV_SOURCE
-          LedgerLiveValidationSchema
-        when COIN_TRACKER_CSV_SOURCE
-          CoinTrackerValidationSchema
-        when TURBO_TAX_CSV_SOURCE
-          TurboTaxValidationSchema
-        when OTHER_CSV_SOURCE
-          raise InvalidSchemaObjectError unless schema.is_a?(Dry::Schema::Params)
-          const_set('OtherValidationSchema', schema)
-        when INFER
-          const_set('InferredSchema', eval(schema))
-        end
+    def dry_inferred_type el
+      if el == Integer
+        'integer'
+      elsif el == Float
+        'float'
+      elsif el == String
+        'string'
+      else
+        @date_format = el[1]
+        'date_time'
       end
     end
+
+    def initialize_schema
+      case csv_props.source
+      when LEDGER_LIVE_CSV_SOURCE
+        LedgerLiveValidationSchema
+      when COIN_TRACKER_CSV_SOURCE
+        CoinTrackerValidationSchema
+      when TURBO_TAX_CSV_SOURCE
+        TurboTaxValidationSchema
+      when OTHER_CSV_SOURCE
+        raise InvalidSchemaObjectError unless schema.is_a?(Dry::Schema::Params)
+        ValCoerc.const_set('OtherValidationSchema', schema)
+      when INFER
+        ValCoerc.const_set('InferredSchema', schema)
+      end
+    end
+
+    #########################################################################
+    #       Transform CSV into data structure acceptable by dry-schema       #
+    #########################################################################
+    def dry_csv_structure
+      res = Array.new
+      csv_props.csv_table.each { |el| res << el.to_h }
+      res
+    end
+
+    class ValCoercError < ::StandardError; end
+
+    class SchemaValidationFailedError < ValCoercError; end
   end
 end

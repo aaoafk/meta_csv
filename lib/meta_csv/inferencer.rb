@@ -32,7 +32,7 @@ module Inferencer
     }.freeze
 
     # cells respond to header and value
-    def infer_types_for_csv_row cells
+    def infer_types_for_cells cells
       inferred_types_for_headers = {}
       cells.each do |cell|
         if cell.value =~ /^[-+]?[0-9]+\.[0-9]+$/

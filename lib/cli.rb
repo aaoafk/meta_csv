@@ -16,7 +16,7 @@ class MetaCsvCLI < Thor
       raise "provided validation schema does not exist" if !File.exist?(schema_file_path)
     end
 
-    MetaCsv::Manager.run file_path: file_path, transformations: transformations, schema_file_path: schema_file_path
+    MetaCsv::Manager.run(file_path:, transformations:, schema_file_path:)
   end
 end
 

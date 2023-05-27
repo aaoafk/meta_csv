@@ -8,11 +8,13 @@ require_relative 'meta_csv/parser'
 require_relative 'meta_csv/transformer'
 require_relative 'meta_csv/csv_data_manipulator'
 require_relative 'meta_csv/standardizer'
+require_relative 'meta_csv/valcoerc'
 
 module MetaCsv # :nodoc:
   class Manager
     CsvProps = Data.define(:old_headers, :new_headers, :source, :csv_table, :proc_csv_mem_efficient)
     StandardTransformation = Data.define(:column_order, :new_column_name, :invoke_standardization)
+    include MetaCsvBase
     class << self
       @@col_ord = 0
 
@@ -51,10 +53,10 @@ module MetaCsv # :nodoc:
       eval(File.open(transformations).read)
 
       # Always infer unless told otherwise
-      source = MetaCsv_Base::INFER
+      source = INFER
       if schema_file_path
         eval(File.open(schema_file_path).read)
-        source = MetaCSVBase::OTHER_CSV_SOURCE
+        source = OTHER_CSV_SOURCE
       end
 
       nhn = standardizing_definition.keys
@@ -65,10 +67,8 @@ module MetaCsv # :nodoc:
       end
 
       if !source in LEDGER_LIVE_CSV_SOURCE | COIN_TRACKER_CSV_SOURCE | TURBO_TAX_CSV_SOURCE | OTHER_CSV_SOURCE | INFER
-        raise "Invalid CSV Source error"
+        raise 'Invalid CSV Source error'
       end
-
-      ap user_schema
 
       result = Parser.new(file: file_path)
 
@@ -77,24 +77,31 @@ module MetaCsv # :nodoc:
         new_headers: nhn,
         source:,
         csv_table: result.csv_table,
-        proc_csv_mem_efficient: result.csv_mem_efficient_iterator
+        proc_csv_mem_efficient: result.csv_mem_efficient_iterator,
+        inferred_encoding: result.inferred_encoding
       )
+
+      ###########################################################################
+      #     The standardizer localizes some information we might need           #
+      ###########################################################################
+
+      Standardizer.define_method(:old_headers, Proc.new { m.old_headers })
+      Standardizer.define_method(:standardizing_functions, Proc.new { defined_transformations_from_file })
+      Standardizer.define_method(:new_headers, Proc.new { m.new_headers })
+      Standardizer.define_method(:inferred_encoding, Proc.new { m.inferred_encoding })
 
       ###################################################################################################
       # The validator can infer but otherwise will just validate using a schema and perform conversions #
       ###################################################################################################
-      ValCoerc.run(csv_props: m, schema: user_schema, source:)
+      coerced_csv = ValCoerc.new.run(csv_props: m, user_schema:)
 
-      ###########################################################################
-      #     The standardizer localizes all of the information we might need     #
-      ###########################################################################
-      Standardizer.define_method(:old_headers, Proc.new { m.old_headers })
-      Standardizer.define_method(:standardizing_functions, Proc.new { defined_transformations_from_file })
-      Standardizer.define_method(:new_headers, Proc.new { m.new_headers })
+      ap coerced_csv
+      exit
 
       transformer = MetaCsv::Transformer.new(meta_csv: m)
       transformed_csv = transformer.run
 
+      ap transformed_csv
       File.open((File.join(Dir.home, "transformed_csv_#{Time.now.strftime("%Y-%m-%d_%H_%M_%S")}.csv")), 'w') do |f|
         f.write transformed_csv
       end

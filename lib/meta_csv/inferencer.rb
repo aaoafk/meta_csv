@@ -4,6 +4,20 @@ require 'time'
 
 module Inferencer
   class << self
+    inferred_schemas = []
+
+    def infer_type_for_chunk chunk
+      inferred_types_for_column = {}
+      # Set column access
+      chunk.rows.by_col!
+      Standardizer.old_headers.each do |header|
+        types_seen = infer_types_for_col_cells(column_name: header, values: chunk.rows[header])
+        # Merge results from types seen into inferred_types_for_column this is where we use DRb
+      end
+      # write the result of this inference to inferred_schemas
+      # how is merging going to be done?
+      inferred_schemas << res
+    end
     # DateTime.rfc3339
     DATE_FORMATS = {
       'rfc3339' => '%FT%T',
@@ -47,6 +61,25 @@ module Inferencer
         end
       end
       inferred_types_for_headers.freeze
+    end
+
+    def infer_types_for_column_cells(column_name:, values:)
+      type_tracker = {}
+      values.each do |v|
+        if v =~ /^[-+]?[0-9]*\.[0-9]+$/
+          type_tracker[Float.to_s] ||= 0
+          type_tracker[Float.to_s] += 1
+        elsif v =~ /^\d+$/
+          type_tracker[Integer.to_s] ||= 0
+          type_tracker[Integer.to_s] += 1
+        elsif matches_date_format? v
+          type_tracker[Date.to_s] ||= 0
+          type_tracker[Date.to_s] += 1
+        else
+          type_tracker[String.to_s] ||= 0
+          type_tracker[String.to_s] += 1
+        end
+      end
     end
 
     private

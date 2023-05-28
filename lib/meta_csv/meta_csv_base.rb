@@ -4,7 +4,6 @@ require_relative 'os'
 
 module MetaCsv 
   module MetaCsvBase 
-    require 'parallel'
     require 'dry/schema'
     Dry::Schema.load_extensions :monads
 
@@ -13,7 +12,7 @@ module MetaCsv
     ###########################################################################
     #              used for parallel processing and csv chunking               #
     ###########################################################################
-    BATCH_SIZE = 2048
+    BATCH_SIZE = 1024
     CPUS_AVAILABLE = OS.cores
 
     LEDGER_LIVE_CSV_SOURCE = :LEDGER_LIVE_CSV_SOURCE

@@ -2,6 +2,7 @@
 
 require 'amazing_print'
 require 'active_support/core_ext/string/inflections'
+require 'parallel'
 require_relative 'meta_csv/version'
 require_relative 'meta_csv/meta_csv_base'
 require_relative 'meta_csv/parser'
@@ -12,7 +13,7 @@ require_relative 'meta_csv/valcoerc'
 
 module MetaCsv # :nodoc:
   class Manager
-    CsvProps = Data.define(:old_headers, :new_headers, :source, :csv_table, :proc_csv_mem_efficient, :inferred_encoding)
+    CsvProps = Data.define(:old_headers, :new_headers, :source, :inferred_encoding)
     StandardTransformation = Data.define(:column_order, :new_column_name, :invoke_standardization)
     include MetaCsvBase
     class << self
@@ -40,6 +41,12 @@ module MetaCsv # :nodoc:
       end
 
       attr_accessor :user_schema
+
+      def seesaw_ractor!(collection:, method:)
+        collection.each do |el|
+          el.rows.send method
+        end
+      end
     end
 
     def self.run(file_path:, transformations:, schema_file_path:)
@@ -72,19 +79,16 @@ module MetaCsv # :nodoc:
 
       result = Parser.new(file: file_path)
 
-      result.csv_chunks.each do |chunk|
-        chunk.rows.each do |row|
-          ap row
-        end
-      end
-      exit
+      # result.csv_chunks.each do |chunk|
+      #   chunk.rows.each do |row|
+      #     ap row
+      #   end
+      # end
 
       m = CsvProps.new(
-        old_headers: result.csv_table.headers,
+        old_headers: result.csv_chunks[0].rows.headers,
         new_headers: nhn,
         source:,
-        csv_table: result.csv_table,
-        proc_csv_mem_efficient: result.csv_mem_efficient_iterator,
         inferred_encoding: result.inferred_encoding
       )
 
@@ -97,6 +101,14 @@ module MetaCsv # :nodoc:
       Standardizer.define_method(:new_headers, Proc.new { m.new_headers })
       Standardizer.define_method(:inferred_encoding, Proc.new { m.inferred_encoding })
 
+      ap result.csv_chunks.size
+      seesaw_ractor!(collection: result.csv_chunks, method: :by_col!)
+      mean_types_for_chunks = ::Parallel.map(result.csv_chunks, in_ractors: OS.cores, ractor: [Inferencer, :infer_type_for_chunk], progress: true)
+      seesaw_ractor!(collection: result.csv_chunks, method: :by_row!)
+
+      # mean_types_for_chunks needs to be merged! into a data structure
+      ap mean_types_for_chunks
+      exit
       ###################################################################################################
       # The validator can infer but otherwise will just validate using a schema and perform conversions #
       ###################################################################################################

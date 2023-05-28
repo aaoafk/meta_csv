@@ -10,9 +10,6 @@ module MetaCsv
   class Parser # :nodoc:
     include MetaCsvBase
 
-    BATCH_SIZE = 2048
-    CPUS_AVAILABLE = OS.cores
-
     attr_accessor :csv_table, :headers, :inferred_encoding, :csv_chunks
 
     def initialize(file:)
@@ -38,22 +35,19 @@ module MetaCsv
         end
       end
 
-      ::Parallel.map(csv_chunks, in_ractors: CPUS_AVAILABLE, ractor: [Parser, :process_chunks])
-      ::Parallel.map(csv_chunks, in_ractors: CPUS_AVAILABLE, ractor: [Parser, :shuffle_chunk_data])
+      ::Parallel.map(csv_chunks, in_ractors: OS.cores, ractor: [Parser, :process_chunks], progress: true)
+      ::Parallel.map(csv_chunks, in_ractors: OS.cores, ractor: [Parser, :shuffle_chunk_data], progress: true)
     end
 
     def self.shuffle_chunk_data chunk
-      data = chunk.rows
-      data.to_a.shuffle
+      chunk.rows.to_a.shuffle!
     end
 
     def self.process_chunks chunk
       # Remove duplicate rows from further processing
-      data = chunk.rows
-      data = data.to_a.uniq! || data
-
+      chunk.rows.to_a.uniq!
       # resolve duplicate headers by grabbing the first value or everything
-      data.each_with_index do |row, _|
+      chunk.rows.each do |row|
         seen = {}
         row.each_pair do |header, val|
           seen[header] ||= []

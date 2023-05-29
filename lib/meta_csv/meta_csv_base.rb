@@ -12,7 +12,7 @@ module MetaCsv
     ###########################################################################
     #              used for parallel processing and csv chunking               #
     ###########################################################################
-    BATCH_SIZE = 1024
+    BATCH_SIZE = 2048
     CPUS_AVAILABLE = OS.cores
 
     LEDGER_LIVE_CSV_SOURCE = :LEDGER_LIVE_CSV_SOURCE

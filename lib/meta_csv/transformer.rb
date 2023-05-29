@@ -30,7 +30,7 @@ module MetaCsv
         #######################################################################
         #               foreach is efficient for giant csv files              #
         #######################################################################
-        meta_csv.proc_csv_mem_efficient.each do |el|
+        meta_csv.each.each do |el|
           row_mapper.curr_row = el
           transformed_row = CSV::Row.new(standardizer.new_headers, row_mapper.standardize_row)
           new_csv << transformed_row.fields

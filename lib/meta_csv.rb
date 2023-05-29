@@ -10,6 +10,7 @@ require_relative 'meta_csv/transformer'
 require_relative 'meta_csv/csv_data_manipulator'
 require_relative 'meta_csv/standardizer'
 require_relative 'meta_csv/valcoerc'
+require_relative 'meta_csv/schema_builder'
 
 module MetaCsv # :nodoc:
   class Manager
@@ -61,7 +62,7 @@ module MetaCsv # :nodoc:
 
       # Always infer unless told otherwise
       source = INFER
-      if schema_file_path
+      if !schema_file_path.empty?
         eval(File.open(schema_file_path).read)
         source = OTHER_CSV_SOURCE
       end
@@ -101,21 +102,31 @@ module MetaCsv # :nodoc:
       Standardizer.define_method(:new_headers, Proc.new { m.new_headers })
       Standardizer.define_method(:inferred_encoding, Proc.new { m.inferred_encoding })
 
-      ap result.csv_chunks.size
+      #########################################################################
+      #    Ractors can't invoke `!' methods, i.e. setters and other things    #
+      #########################################################################
       seesaw_ractor!(collection: result.csv_chunks, method: :by_col!)
-      mean_types_for_chunks = ::Parallel.map(result.csv_chunks, in_ractors: OS.cores, ractor: [Inferencer, :infer_type_for_chunk], progress: true)
+      mean_types_for_csv_row_chunks = ::Parallel.map(result.csv_chunks, in_ractors: OS.cores, ractor: [Inferencer, :infer_type_for_chunk], progress: true)
       seesaw_ractor!(collection: result.csv_chunks, method: :by_row!)
 
-      # mean_types_for_chunks needs to be merged! into a data structure
-      ap mean_types_for_chunks
-      exit
-      ###################################################################################################
-      # The validator can infer but otherwise will just validate using a schema and perform conversions #
-      ###################################################################################################
-      coerced_csv = ValCoerc.new.run(csv_props: m, user_schema:)
+      # The master_schema has the inferred types across all chunks.
+      Inferencer.merge_inferred_types mean_types_for_csv_row_chunks
 
+      #########################################################################
+      #         ValCoerc will coerce values using the inferred schema         #
+      #########################################################################
+      blueprint = user_schema if source == OTHER_CSV_SOURCE
+      blueprint = Inferencer.master_schema if source == INFER
+
+      ap blueprint
+      sb = SchemaBuilder.new(headers: Standardizer.instance.old_headers, blueprint:)
+      sb.build_schema
+      ap sb.schema, indent: -2, class: Dry::Schema::Params
       exit
-      transformer = MetaCsv::Transformer.new(meta_csv: m)
+      coerced_csv = ValCoerc.new.run(csv_chunks: , user_schema:)
+
+      # coerced_csv needs to be a CSV table?
+      transformer = Transformer.new(meta_csv: coerced_csv)
       transformed_csv = transformer.run
 
       ap transformed_csv

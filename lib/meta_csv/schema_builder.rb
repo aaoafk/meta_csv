@@ -58,8 +58,7 @@ module MetaCsv
           end
         end
 
-        case types_for_predicate.size
-        when 1
+        if types_for_predicate.size == 1
           predicate_type(column_name: col_name, types: types_for_predicate)
         else
           predicate_types(column_name: col_name, types: types_for_predicate)
@@ -74,7 +73,7 @@ module MetaCsv
     def predicate_types(column_name:, types:)
       schema_builder << "    required(:#{column_name}) {"
       types.each_with_index do |t, idx|
-        schema_builder << " #{dry_inferred_type_for_predicate(t)} |" if (idx < types.size - 2)
+        schema_builder << " #{dry_inferred_type_for_predicate(t)} |" if (idx < types.size - 1)
         schema_builder << " #{dry_inferred_type_for_predicate(t)}" if (idx == types.size - 1)
       end
       schema_builder << "}\n"

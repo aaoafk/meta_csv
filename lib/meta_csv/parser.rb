@@ -36,15 +36,12 @@ module MetaCsv
       end
 
       ::Parallel.map(csv_chunks, in_ractors: OS.cores, ractor: [Parser, :process_chunks], progress: true)
-      ::Parallel.map(csv_chunks, in_ractors: OS.cores, ractor: [Parser, :shuffle_chunk_data], progress: true)
-    end
-
-    def self.shuffle_chunk_data chunk
-      chunk.rows.to_a.shuffle!
     end
 
     def self.process_chunks chunk
       # Remove duplicate rows from further processing
+
+      chunk.rows.to_a.shuffle!
       chunk.rows.to_a.uniq!
       # resolve duplicate headers by grabbing the first value or everything
       chunk.rows.each do |row|

@@ -1,0 +1,165 @@
+@startuml
+
+left to right direction
+skinparam handwritten true
+
+set namespaceSeparator ::
+
+class ValCoerc
+class Transformer
+class Data
+
+package MetaCsv::Manager {
+
+		/' Relations '/
+		Data <|-- CsvProps
+		Data <|-- StandardTransformation 
+
+		/' CsvProps definition '/
+		class CsvProps {
+		Array[String] old_headers
+		Array[String] new_headers
+		Symbol source
+		inferred_encoding
+		}
+
+		/' StandardTransformation definition '/
+		class StandardTransformation {
+				Integer column_order
+				String new_column_name
+				Proc invoke_standardization
+		}
+
+		class Manager {
+				Data CsvProps
+				Array[Data] StandardTransformation
+		}
+
+		/' Singleton Class Manager '/
+		class SC_Manager << Singleton >> {
+				Integer col_ord
+				Hash standardizing_definition
+				Method validation_schema
+				Method fill_column(new_column_name, &blk)
+				attr_accessor user_schema
+				Method seesaw_ractor!(collection, method)
+				Method run(file_path, transformations, schema_file_path)
+		}
+}
+
+
+
+package MetaCsv::Parser {
+		class Parser {
+				+csv_table
+				+headers
+				+inferred_encoding
+				+csv_chunks
+				-initialize_chunks(file)
+				-infer_encoding_or_default(file)
+				-converters()
+		}
+
+		class SC_Parser << Singleton >> {
+				-process_chunks(chunk)
+		}
+
+		class CsvChunk {
+						+rows
+		}
+
+		Data <|-- CsvChunk
+		Parser -- SC_Parser
+
+}
+
+package MetaCsv::Standardizer {
+		class Standardizer extends Singleton
+		Standardizer : old_headers
+		Standardizer : standardizing_functions
+		Standardizer : new_headers
+		Standardizer : inferred_encoding
+}
+
+package MetaCsv::Inferencer {
+		class Inferencer << Singleton >> {
+				attr_accessor :master_schema
+				infer_type_for_chunk(chunk : Csv::Table)
+				matches_date_format?(val : String)
+				merge_inferred_type(inferred_types_for_chunks)
+
+		}
+}
+
+/' MetaCsvBase '/
+
+package MetaCsv::MetaCsvBase { 
+		class MetaCsvBase {
+				Integer BATCH_SIZE
+				Integer CPUS_AVAILABLE
+				Symbol LEDGER_LIVE_CSV_SOURCE
+				Symbol COIN_TRACKER_CSV_SOURCE
+				Symbol TURBO_TAX_CSV_SOURCE
+				Symbol OTHER_CSV_SOURCE
+				Symbol INFER
+				DateFormatString TURBO_TAX_DATE_FORMAT
+				Array[String] TURBO_TAX_TRANSACTION_TYPES
+				Dry::Schema.Params LedgerLiveValidationSchema
+				Dry::Schema.Params CoinTrackerValidationSchema 
+				Dry::Schema.Params TurboTaxValidationSchema
+				Hash[String => Symbol] LEDGER_LIVE_CSV_ROW_HEADERS
+				Hash[String => Symbol] COIN_TRACKER_CSV_ROW_HEADERS
+				Hash[String => Symbol] TURBO_TAX_CSV_ROW_HEADERS
+		}
+}
+
+package MetaCsv::SchemaBuilder {
+		class SchemaBuilder {
+				+schema()
+				+headers()
+				+schema_builder()
+				+blueprint
+				+build_schema
+				+begin_schema_declaration!
+				+before_body_declaration!
+				+body_declaration!
+				+predicates_declaration!
+				+predicate_type(column_name:, types:)
+				predicate_types(column_name:, types:)
+				+dry_inferred_type_for_predicate(el)
+				+dry_inferred_type(el)
+				+end_declaration!
+		}
+}
+
+package MetaCsv::ValCoerc {
+		class SC_ValCoerc << Singleton >> {
+			  +dried_csv
+				+run(csv_chunks)
+				+dry_csv_structure
+		}
+
+		class ValCoerc {
+				+csv_props
+			  +validate_using_schema
+				+verify_schema_transform(schema_validation_result:)
+				+run(csv_chunks)
+				+dry_csv_structure
+		}
+		class ValCoercError
+		class SchemaValidationFailedError
+		SchemaValidationFailedError <|-- StandardError
+		ValCoercError <|-- StandardError
+																																																			
+}
+
+																																
+
+note left of MetaCsv::MetaCsvBase : "Pretty much every class include this module.\nA lot of these fields can be removed if we just go with inferencing."
+
+note "the transformations file when evaluated hooks into the fill_column method.\nfill_column encapsulates the data from each `fill_column` function via a StandardTransformation object.\nEach of those objects is stored inside Managers singleton class as an instance variable called @standardizing_definition." as N1
+
+
+
+MetaCsv::Manager::Manager .. N1
+@enduml

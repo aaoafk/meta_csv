@@ -6,7 +6,7 @@ require_relative 'meta_csv_base'
 module MetaCsv
   class ValCoerc
     include MetaCsvBase
-    attr_accessor :csv_props, :date_format, :dried_csv, :columns_with_multiple_values
+    attr_accessor :csv_props, :dried_csv
     attr_reader :header_to_type
 
     class << self
@@ -55,8 +55,6 @@ module MetaCsv
 
 
     # Build a schema with column names that are snakified and types that are inferred
-
-
 
     def initialize_schema
       case csv_props.source

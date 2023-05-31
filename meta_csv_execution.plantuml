@@ -1,0 +1,48 @@
+@startuml 
+skinparam packageStyle rectangle
+participant Manager as M
+participant Parser as P
+participant Inferencer as I
+participant ValCoerc as V
+participant Standardizer as S
+participant SchemaBuilder as SB
+participant Transformer as TF
+
+M -> M: eval transformations file and store in singleton class.\nEncapsulate transformations state in StandardTransformation objects.
+M -> M: if the schema_file_path is provided then evaluate that and store in singleton class.
+M -> P: Initialize the Parser with the file_path.
+activate P #FFBBBB
+P -> P: initialize_chunks call.\nLazily takes slices from the file and executes CSV.parse on them.\nEach block of CSV rows is stored in a CsvChunk data object.
+note top 
+parallel processing is done via `parallel` gem.
+We use ractors instead of threads.
+I dunno if this is better but im getting cryptic errors with ractors.
+end note
+deactivate
+return Parser Object
+M -> M: Initialize CsvProps with parser results.
+M -> S: define methods on the Standardizer.\nPopulate old_headers, standardizing_functions, new_headers, inferred_encoding.
+return
+M -> M: send msg seesaw_ractor! which will execute by_col! on each csv.chunk before we execute the Inferencer.
+M -> I: Parallel.map on csv_chunks, execute Inferencer.infer_type_for_chunk
+activate I #FFBBBB
+I -> I: Each chunk is indexed by the column header.\nWe calculate the average for String, Float, Integer, Date value appearance.
+return
+M -> M: send msg seesaw_ractor!.\nReset the access mode for each csv_chunk to by_row!.
+M -> I: call Inferencer.merge_inferred_types.\nMerge means for csv_chunks into one master_schema.\nThe master_schema is just the mean of means.\nEach CsvChunk is just a Hash for the column_name to an array of 4 values.\nThe average appearance of a Float, Integer, Date or String type.\n
+return
+M -> SB: Initialize SchemaBuilder with the old_headers and the Inferencer.master_schema.
+return
+M -> SB: sb.build_schema.\nDynamically builds a Dry::Schema.Params object based on the Inferencer.master_schema which is stored in the instance of SchemaBuilder as an instance variable called blueprint.\n
+return a Dry::Schema.Params object.
+M -> V: Initialize the value coercer.
+activate V #FFBBBB
+V -> V: call dry_csv_structure and store the result in dried_csv.\nThe entire purpose of this is to convert each chunk into a format that Dry can validate against.
+V -> V: Need to call initialize_schema before we validate_using_schema, otherwise the inferred schema wont be set as a constant on ValCoerc.
+return CSV coerced
+M -> TF: standardize csv by calling CSV.generate.\nUse the row_mapper to standardize each row and append the result to the new_csv 
+return Transformed CSV
+M -> M: Write the transformed_csv to a file and we are all done.
+
+@enduml
+

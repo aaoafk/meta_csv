@@ -29,7 +29,7 @@ module MetaCsv # :nodoc:
       #######################################################################################
       def fill_column(new_column_name, &blk)
         new_column_name.gsub!(/ /, '_')
-        ncn = new_column_name.underscore
+        new_column_name.downcase!
         standardizing_definition.fetch(ncn) { |k| standardizing_definition[k] = [@@col_ord, blk] }
         @@col_ord += 1
       end
@@ -123,6 +123,7 @@ module MetaCsv # :nodoc:
       sb.build_schema
       ap sb.schema, indent: -2, class: Dry::Schema::Params
       exit
+
       coerced_csv = ValCoerc.new.run(csv_chunks: , user_schema:)
 
       # coerced_csv needs to be a CSV table?

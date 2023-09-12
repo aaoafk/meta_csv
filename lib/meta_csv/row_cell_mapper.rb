@@ -1,19 +1,18 @@
 # frozen_string_literal: true
 
-require_relative 'meta_csv_base'
-require_relative 'transaction'
+require_relative "meta_csv_base"
+require_relative "transaction"
 
-module MetaCsv 
+module MetaCsv
   class RowCellMapper # :nodoc:
-    include MetaCsvBase 
+    include MetaCsvBase
     attr_accessor :meta_csv
     attr_reader :curr_row, :standardizer
 
-    def initialize(meta_csv)
-      @meta_csv = meta_csv
-      @standardizer = Standardizer.instance
-      x = Data.define(*meta_csv.old_headers.each(&:to_sym))
-      RowCellMapper.const_set('InferredRow', x)
+    def initialize(standardizer)
+      @standardizer = standardizer
+      x = Data.define(*standardizer.old_headers.each(&:to_sym))
+      RowCellMapper.const_set(:InferredRow, x)
     end
 
     def curr_row=(curr_csv_row)
@@ -21,7 +20,6 @@ module MetaCsv
     end
 
     def standardize_row
-
       #########################################################################################################################
       # If the validator infers then everything is given .maybe how can we guard nil access with transformation functions?    #
       #########################################################################################################################
@@ -68,6 +66,5 @@ module MetaCsv
     def initialize_turbo_tax_transaction curr_csv_row
       Transaction::TurboTaxTransaction.new
     end
-
   end
 end

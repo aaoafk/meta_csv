@@ -1,13 +1,14 @@
 # frozen_string_literal: true
 
-require_relative 'inferencer'
-require_relative 'standardizer'
-require 'refinements/hashes'
+require_relative "inferencer"
+require "dry/schema"
+
+# 1. We can use key(name: Symbol, macro: `Macros::Required` or any other `Macros::Key` subclass
+#    also takes a block to add `required(:name)`
+#
 
 module MetaCsv
   class SchemaBuilder
-    using Refinements::Hashes
-
     attr_accessor :schema, :headers, :schema_builder, :blueprint
 
     def initialize(headers:, blueprint:)
@@ -33,7 +34,7 @@ module MetaCsv
     end
 
     def before_body_declaration!
-      schema_builder << "  before(:key_coercer) { |result| result.to_h.symbolize_keys! }\n"
+      schema_builder << "  before(:key_coercer) { |result| result.to_h.transform_keys!(&:to_sym) }\n"
     end
 
     def body_declaration!
@@ -73,33 +74,33 @@ module MetaCsv
     def predicate_types(column_name:, types:)
       schema_builder << "    required(:#{column_name}) {"
       types.each_with_index do |t, idx|
-        schema_builder << " #{dry_inferred_type_for_predicate(t)} |" if (idx < types.size - 1)
-        schema_builder << " #{dry_inferred_type_for_predicate(t)}" if (idx == types.size - 1)
+        schema_builder << " #{dry_inferred_type_for_predicate(t)} |" if idx < types.size - 1
+        schema_builder << " #{dry_inferred_type_for_predicate(t)}" if idx == types.size - 1
       end
       schema_builder << "}\n"
     end
 
     def dry_inferred_type_for_predicate el
       if el == Integer
-        'int?'
+        "int?"
       elsif el == Float
-        'float?'
+        "float?"
       elsif el == String
-        'str?'
+        "str?"
       else
-        'date?'
+        "date?"
       end
     end
 
     def dry_inferred_type el
       if el == Integer
-        'integer'
+        "integer"
       elsif el == Float
-        'float'
+        "float"
       elsif el == Date
-        'date'
+        "date"
       else
-        'string'
+        "string"
       end
     end
 
@@ -107,6 +108,5 @@ module MetaCsv
       schema_builder << "  end\n"
       schema_builder << "end\n"
     end
-
   end
 end

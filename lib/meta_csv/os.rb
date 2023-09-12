@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require 'etc'
+require "etc"
 
 module OS
   class << self
@@ -21,7 +21,7 @@ module OS
     end
 
     def jruby?
-      RUBY_ENGINE == 'jruby'
+      RUBY_ENGINE == "jruby"
     end
 
     def cores

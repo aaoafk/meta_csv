@@ -11,18 +11,18 @@ gem "minitest", "~> 5.0"
 
 gem "standard", "~> 1.3"
 
-gem 'amazing_print'
+gem "amazing_print"
 
-gem 'debug'
+gem "debug"
 
-gem 'dry-schema'
+gem "dry-schema"
 
-gem 'dry-monads'
+gem "dry-monads"
 
-gem 'refinements'
+gem "csv"
 
-gem 'csv'
+gem "parallel"
 
-gem 'activesupport'
+gem "pry"
 
-gem 'parallel'
+gem "pry-doc"

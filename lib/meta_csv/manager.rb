@@ -96,7 +96,7 @@ module MetaCsv
         coerced_csv = ValCoerc.new.run(csv_chunks:, user_schema:)
 
         # coerced_csv needs to be a CSV table?
-        transformer = Transformer.new(meta_csv: coerced_csv)
+        transformer = Transformer.new(meta_csv: coerced_csv, standardizer: standardizer)
         transformed_csv = transformer.run
 
         ap transformed_csv
